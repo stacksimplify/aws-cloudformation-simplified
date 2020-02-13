@@ -49,3 +49,12 @@ In the second part of the course, you will implement the below listed three conc
 During the learning process, you will write 45+ cloud formation templates written in YAML. 
 
 This course also provides 45+ pre-built templates which you can use them during the learning process.  In addition this course comes with 190 slides in a PDF document.
+
+## AWS CloudFormation Udemy Course
+[![Image](https://stacksimplify.com/course-images/AWS-CloudFormation-Simplified.png "AWS CloudFormation - Simplified")](https://www.udemy.com/aws-cloudformation-simplified-hands-on-learning/?couponCode=STACKSIMPLIFY-2019)
+
+## My Other AWS Courses
+- [Udemy Enroll](https://github.com/stacksimplify/udemy-enroll)
+
+## Stack Simplify Udemy Profile
+- [Udemy Profile](https://www.udemy.com/user/kalyan-reddy-9/)
