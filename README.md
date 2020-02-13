@@ -8,7 +8,7 @@ There are two parts to this course.
 
 In the first part of the course you will learn all the AWS CloudFormation concepts by practically implementing them. Below are the sections for part one. 
 
-Part-1: AWS CloudFormation 
+## Part-1: AWS CloudFormation Fundamentals
 
 01. Introduction to CloudFormation
 
@@ -36,6 +36,7 @@ Part-1: AWS CloudFormation
 
 13. Nested Stacks
 
+## Part-2: Implement CloudFormation Templates for Continuous Integration, Continuous Delivery and Infrastructure as Code 
 In the second part of the course, you will implement the below listed three concepts using AWS CloudFormation & AWS Management Console.  You will write cloud formation templates for AWS Developer tools (AWS CodeCommit, CodeBuild, CodeDeploy & CodePipeline) to implement the CI, CD and IAC.
 
 01. Continuous Integration (CI)
@@ -44,11 +45,6 @@ In the second part of the course, you will implement the below listed three conc
 
 03. Infrastructure as Code (IAC)
 
-Part-2: AWS Continuous Integration, Continuous Delivery and Infrastructure as Code using AWS CloudFormation & AWS Management Console
-
-14. Continuous Integration & Continuous Delivery using CloudFormation
-
-15. Infrastructure as Code using CloudFormation
 
 During the learning process, you will write 45+ cloud formation templates written in YAML. 
 
