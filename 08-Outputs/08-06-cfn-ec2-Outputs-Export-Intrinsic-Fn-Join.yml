@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Outputs practice
+
+Parameters:
+  MyKeyName:
+    Description: Select the Key Name
+    Type: AWS::EC2::KeyPair::KeyName
+  MyEnvironmentName:
+    Description: Select the environment 
+    Type: String
+    Default: dev
+    AllowedValues: 
+      - dev
+      - prod
+    ConstraintDescription: must be development or production      
+
+Mappings:     
+  MyRegionMap:
+    us-east-2:
+      HVM64: ami-0cd3dfa4e37921605
+    us-west-1:
+      HVM64: ami-0ec6517f6edbf8044
+  MyEnvironmentMap:
+    dev:
+      instanceType: t2.micro
+    prod:
+      instanceType: t2.small   
+
+Conditions:
+  CreateDevSecurityGroup: !Equals [!Ref MyEnvironmentName, dev]
+
+Resources:
+  MyVMInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap
+        - MyRegionMap
+        - !Ref 'AWS::Region'
+        - HVM64
+      InstanceType: !FindInMap
+        - MyEnvironmentMap
+        - !Ref MyEnvironmentName
+        - instanceType
+      KeyName: !Ref MyKeyName
+      SecurityGroups: !If [CreateDevSecurityGroup, [!Ref MyDevGlobalSecurityGroup], !Ref 'AWS::NoValue']
+        
+
+  MyDevGlobalSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: CreateDevSecurityGroup
+    Properties:
+      GroupDescription: My Dev environment Global Security Group
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+
+Outputs:
+  MyInstanceId:
+    Description: My instance id
+    Value: !Ref MyVMInstance
+  MyDNSName:
+    Description: My Public DNS Name
+    Value: !GetAtt MyVMInstance.PublicDnsName
+  MyInstanceAvailabilityZone:
+    Description: Instance Availability Zone
+    Value: !GetAtt MyVMInstance.AvailabilityZone    
+    Export: 
+      Name: !Sub "${AWS::StackName}-InstanceAz"
+  MyDevGlobalSecurityGroup:
+    Description: My Dev SG
+    Value: !Ref MyDevGlobalSecurityGroup
+    Condition: CreateDevSecurityGroup
+    Export:
+      Name: !Join ["-", [!Ref 'AWS::StackName', MyDevSSHGlobalSG]]  
+      
+

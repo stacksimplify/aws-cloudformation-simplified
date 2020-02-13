@@ -1,0 +1,36 @@
+version: 0.2
+
+environment_variables:
+  plaintext:
+    TEMPLATE_FILES: |
+      vpc.yml
+    CONFIG_FILES: |
+      vpc-config.json
+
+#https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html#runtime-versions-buildspec-file
+phases:
+  install:
+    runtime-versions:
+      nodejs: 8
+    commands:
+      npm install jsonlint -g
+  pre_build:
+    commands:
+      - echo "Validating CFN templates"
+      - |
+        for cfn_template in $TEMPLATE_FILES; do
+          echo "Validating CloudFormation template file $cfn_template"
+          aws cloudformation validate-template --template-body file://$cfn_template
+        done
+      - |
+        for conf in $CONFIG_FILES; do
+          echo "Validating CFN parameters config file $conf"
+          jsonlint -q $conf
+        done
+  build:
+    commands:
+      - echo "do nothing"
+artifacts:
+  files:
+    - vpc.yml
+    - vpc-config.json

@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create CodeDeploy Stack Template
+
+
+Parameters:
+  ApplicationRepoName:
+    Type: String
+    Description: Name of the repo which contains Rest Application.
+    Default: ccdemo
+  ArtifactStoreS3Location:
+    Type: String
+    Description: Name of the S3 bucket to store CodePipeline artificat.
+    Default: rest-apps
+
+Resources:
+  CodeBuildRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName:
+        Fn::Sub: CodeBuildRole-${AWS::StackName}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: /service-role/
+      Policies:
+        - PolicyName: "CodeBuildCICDAccessPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "codecommit:GitPull"
+                Resource:
+                  - Fn::Sub: arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${ApplicationRepoName}
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource:
+                  - Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*
+              - Effect: "Allow"
+                Action:
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                  - "s3:GetObjectVersion"
+                  - "s3:ListBucket"
+                Resource:
+                  - Fn::Sub: arn:aws:s3:::codepipeline-${AWS::Region}-*
+                  - Fn::Sub: arn:aws:s3:::${ArtifactStoreS3Location}/*
+                  - Fn::Sub: arn:aws:s3:::${ArtifactStoreS3Location}
+
+  BuildRestAppCFNProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub BuildRestAppCFN-${AWS::StackName}
+      Description: Build war file for rest application
+      ServiceRole: !GetAtt [ CodeBuildRole, Arn ]
+      Artifacts:
+        Type: S3
+        Location: !Ref ArtifactStoreS3Location
+        Name: !Sub BuildRestAppCFN-${AWS::StackName}
+        Packaging: ZIP        
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:2.0
+      Source:
+        Location: !Sub https://git-codecommit.us-east-2.amazonaws.com/v1/repos/${ApplicationRepoName}
+        Type: CODECOMMIT
+      TimeoutInMinutes: 15
+      Tags:
+        - Key: Name
+          Value: !Sub BuildRestAppCFN-${AWS::StackName}
+
+
+  CodeDeployServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName:
+        Fn::Sub: CodeDeployServiceRole-${AWS::StackName}
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codedeploy.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: "CodeDeployCICDAccessPolicy"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeInstanceStatus'
+                  - 'ec2:TerminateInstances'
+                  - 'tag:GetTags'
+                  - 'tag:GetResources'
+                  - 'sns:Publish'
+                  - 'cloudwatch:DescribeAlarms'
+                  - 'cloudwatch:PutMetricAlarm'
+                Resource: '*'
+
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties: 
+      ApplicationName: !Sub RestApp-${AWS::StackName}
+      ComputePlatform: Server
+
+  CodeDeployDeploymentGroup: 
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties: 
+      ApplicationName: !Ref CodeDeployApplication
+      Ec2TagFilters: 
+        - Key: Name
+          Value: dev
+          Type: "KEY_AND_VALUE"
+      ServiceRoleArn: !GetAtt [ CodeDeployServiceRole, Arn ]      
+      DeploymentGroupName: !Sub DeploymentGroup-${AWS::StackName}
+      Deployment: 
+        Description: "Second Deploy"
+        IgnoreApplicationStopFailures: true
+        Revision:
+          RevisionType: S3
+          S3Location: 
+            Bucket: !Ref ArtifactStoreS3Location
+            Key: !Sub BuildRestAppCFN-${AWS::StackName}
+            BundleType: Zip

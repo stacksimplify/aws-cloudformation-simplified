@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Root Stack Template
+
+Parameters:
+  VPCId: 
+    Description: Create security group in this respective VPC
+    Type: AWS::EC2::VPC::Id
+
+
+Resources:
+  DevSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Dev Apps Security Group
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '8080'
+          ToPort: '8080'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '9080'
+          ToPort: '9080'
+          CidrIp: 0.0.0.0/0          
+      VpcId: !Ref VPCId
+
+Outputs:
+  DevSGGroupId:
+    Description: Dev Security Group
+    Value: !Ref DevSecurityGroup

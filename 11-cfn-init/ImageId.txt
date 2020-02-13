@@ -1,0 +1,3 @@
+us-east-2 - Amazon Linux AMI ID
+--------------------------------
+ami-0cd3dfa4e37921605

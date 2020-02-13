@@ -1,0 +1,408 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create a CodePipeline to include CloudFormation Features, CodeBuild and Approval steps.
+
+Parameters:
+  CFNTemplateRepoName:
+    Type: String
+    Description: Name of the repo which contains CFN template.
+    Default: vpcrepo
+  ArtifactStoreS3Location:
+    Type: String
+    Description: Name of the S3 bucket to store CodePipeline artificat.
+    Default: iac0189
+
+Resources:
+  CodeBuildRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub CodeBuildRole-${AWS::StackName}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: /service-role/
+      Policies:
+        - PolicyName: "CodeBuildVPCAccessPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "cloudformation:Get*"
+                  - "cloudformation:Describe*"
+                  - "cloudformation:List*"
+                Resource: '*'
+              - Effect: "Allow"
+                Action:
+                  - "codecommit:ListBranches"
+                  - "codecommit:ListRepositories"
+                  - "codecommit:BatchGetRepositories"
+                  - "codecommit:Get*"
+                  - "codecommit:GitPull"
+                Resource:
+                  - Fn::Sub: arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${CFNTemplateRepoName}
+              - Effect: "Allow"
+                Action:
+                  - "ec2:Describe*"
+                  - "cloudformation:ValidateTemplate"
+                  - "elasticloadbalancing:Describe*"
+                  - "autoscaling:Describe*"
+                  - "iam:Get*"
+                  - "iam:List*"
+                  - "logs:Describe*"
+                  - "logs:Get*"
+                  - "tag:Get*"
+                Resource:
+                  - "*"
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource:
+                  - Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*
+              - Effect: "Allow"
+                Action:
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                  - "s3:GetObjectVersion"
+                  - "s3:ListBucket"
+                Resource:
+                  - Fn::Sub: arn:aws:s3:::codepipeline-${AWS::Region}-*
+                  - Fn::Sub: arn:aws:s3:::${ArtifactStoreS3Location}/*
+                  - Fn::Sub: arn:aws:s3:::${ArtifactStoreS3Location}
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub CodeBuildCFN-${AWS::StackName}
+      Description: Build to validate and copy CFN templates
+      ServiceRole: !GetAtt [ CodeBuildRole, Arn ]
+      Artifacts:
+        Type: S3
+        Location: !Ref ArtifactStoreS3Location
+        Name: !Sub CodeBuildCFN-${AWS::StackName}
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:2.0
+        EnvironmentVariables:
+          - Name: TEMPLATE_BUCKET
+            Value: !Ref ArtifactStoreS3Location
+          - Name: TEMPLATE_PREFIX
+            Value: codebuild
+      Source:
+        Location: !Sub https://git-codecommit.us-east-2.amazonaws.com/v1/repos/${CFNTemplateRepoName}
+        Type: CODECOMMIT
+      TimeoutInMinutes: 15
+      Tags:
+        - Key: Name
+          Value: !Sub CodeBuildCFN-${AWS::StackName}
+
+
+  CodePipelineRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub CodePipelineRole-${AWS::StackName}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "codepipeline.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      Policies:
+        - PolicyName: "CodePipelineVPCAccessPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:DeleteObject"
+                  - "s3:GetObject"
+                  - "s3:GetObjectVersion"
+                  - "s3:ListBucket"
+                  - "s3:PutObject"
+                  - "s3:GetBucketPolicy"
+                Resource:
+                  - Fn::Sub: arn:aws:s3:::${ArtifactStoreS3Location}
+                  - Fn::Sub: arn:aws:s3:::${ArtifactStoreS3Location}/*
+              - Effect: "Allow"
+                Action:
+                  - "sns:Publish"
+                Resource: '*'
+              - Effect: "Allow"
+                Action:
+                  - "codecommit:ListBranches"
+                  - "codecommit:ListRepositories"
+                  - "codecommit:BatchGetRepositories"
+                  - "codecommit:Get*"
+                  - "codecommit:GitPull"
+                  - "codecommit:UploadArchive"
+                Resource: !Sub arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${CFNTemplateRepoName}
+              - Effect: "Allow"
+                Action:
+                  - "cloudformation:CreateChangeSet"
+                  - "cloudformation:CreateStack"
+                  - "cloudformation:CreateUploadBucket"
+                  - "cloudformation:DeleteStack"
+                  - "cloudformation:Describe*"
+                  - "cloudformation:List*"
+                  - "cloudformation:UpdateStack"
+                  - "cloudformation:ValidateTemplate"
+                  - "cloudformation:ExecuteChangeSet"
+                Resource: '*'
+              - Effect: "Allow"
+                Action:
+                  - "codebuild:StartBuild"
+                  - "codebuild:BatchGetBuilds"
+                Resource: '*'
+              - Effect: "Allow"
+                Action:
+                  - "iam:PassRole"
+                Resource:
+                  - Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole-${AWS::StackName}  
+
+
+  CloudFormationRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub CloudFormationRole-${AWS::StackName}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "cloudformation.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      Policies:
+        - PolicyName: "CloudFormationVPCAccessPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                Resource:
+                  - Fn::Sub: arn:aws:s3:::${ArtifactStoreS3Location}
+                  - Fn::Sub: arn:aws:s3:::${ArtifactStoreS3Location}/*
+              - Effect: Allow
+                Action:
+                  - 'ec2:AcceptVpcPeeringConnection'
+                  - 'ec2:AcceptVpcEndpointConnections'
+                  - 'ec2:AllocateAddress'
+                  - 'ec2:AssignIpv6Addresses'
+                  - 'ec2:AssignPrivateIpAddresses'
+                  - 'ec2:AssociateAddress'
+                  - 'ec2:AssociateDhcpOptions'
+                  - 'ec2:AssociateRouteTable'
+                  - 'ec2:AssociateSubnetCidrBlock'
+                  - 'ec2:AssociateVpcCidrBlock'
+                  - 'ec2:AttachClassicLinkVpc'
+                  - 'ec2:AttachInternetGateway'
+                  - 'ec2:AttachNetworkInterface'
+                  - 'ec2:AttachVpnGateway'
+                  - 'ec2:AuthorizeSecurityGroupEgress'
+                  - 'ec2:AuthorizeSecurityGroupIngress'
+                  - 'ec2:CreateCustomerGateway'
+                  - 'ec2:CreateDefaultSubnet'
+                  - 'ec2:CreateDefaultVpc'
+                  - 'ec2:CreateDhcpOptions'
+                  - 'ec2:CreateEgressOnlyInternetGateway'
+                  - 'ec2:CreateFlowLogs'
+                  - 'ec2:CreateInternetGateway'
+                  - 'ec2:CreateNatGateway'
+                  - 'ec2:CreateNetworkAcl'
+                  - 'ec2:CreateNetworkAcl'
+                  - 'ec2:CreateNetworkAclEntry'
+                  - 'ec2:CreateNetworkInterface'
+                  - 'ec2:CreateNetworkInterfacePermission'
+                  - 'ec2:CreateRoute'
+                  - 'ec2:CreateRouteTable'
+                  - 'ec2:CreateSecurityGroup'
+                  - 'ec2:CreateSubnet'
+                  - 'ec2:CreateTags'
+                  - 'ec2:CreateVpc'
+                  - 'ec2:CreateVpcEndpoint'
+                  - 'ec2:CreateVpcEndpointConnectionNotification'
+                  - 'ec2:CreateVpcEndpointServiceConfiguration'
+                  - 'ec2:CreateVpcPeeringConnection'
+                  - 'ec2:CreateVpnConnection'
+                  - 'ec2:CreateVpnConnectionRoute'
+                  - 'ec2:CreateVpnGateway'
+                  - 'ec2:DeleteCustomerGateway'
+                  - 'ec2:DeleteDhcpOptions'
+                  - 'ec2:DeleteEgressOnlyInternetGateway'
+                  - 'ec2:DeleteFlowLogs'
+                  - 'ec2:DeleteInternetGateway'
+                  - 'ec2:DeleteNatGateway'
+                  - 'ec2:DeleteNetworkAcl'
+                  - 'ec2:DeleteNetworkAclEntry'
+                  - 'ec2:DeleteNetworkInterface'
+                  - 'ec2:DeleteNetworkInterfacePermission'
+                  - 'ec2:DeleteRoute'
+                  - 'ec2:DeleteRouteTable'
+                  - 'ec2:DeleteSecurityGroup'
+                  - 'ec2:DeleteSubnet'
+                  - 'ec2:DeleteTags'
+                  - 'ec2:DeleteVpc'
+                  - 'ec2:DeleteVpcEndpoints'
+                  - 'ec2:DeleteVpcEndpointConnectionNotifications'
+                  - 'ec2:DeleteVpcEndpointServiceConfigurations'
+                  - 'ec2:DeleteVpcPeeringConnection'
+                  - 'ec2:DeleteVpnConnection'
+                  - 'ec2:DeleteVpnConnectionRoute'
+                  - 'ec2:DeleteVpnGateway'
+                  - 'ec2:DescribeAccountAttributes'
+                  - 'ec2:DescribeAddresses'
+                  - 'ec2:DescribeAvailabilityZones'
+                  - 'ec2:DescribeClassicLinkInstances'
+                  - 'ec2:DescribeCustomerGateways'
+                  - 'ec2:DescribeDhcpOptions'
+                  - 'ec2:DescribeEgressOnlyInternetGateways'
+                  - 'ec2:DescribeFlowLogs'
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeInternetGateways'
+                  - 'ec2:DescribeKeyPairs'
+                  - 'ec2:DescribeMovingAddresses'
+                  - 'ec2:DescribeNatGateways'
+                  - 'ec2:DescribeNetworkAcls'
+                  - 'ec2:DescribeNetworkInterfaceAttribute'
+                  - 'ec2:DescribeNetworkInterfacePermissions'
+                  - 'ec2:DescribeNetworkInterfaces'
+                  - 'ec2:DescribePrefixLists'
+                  - 'ec2:DescribeRouteTables'
+                  - 'ec2:DescribeSecurityGroupReferences'
+                  - 'ec2:DescribeSecurityGroups'
+                  - 'ec2:DescribeStaleSecurityGroups'
+                  - 'ec2:DescribeSubnets'
+                  - 'ec2:DescribeTags'
+                  - 'ec2:DescribeVpcAttribute'
+                  - 'ec2:DescribeVpcClassicLink'
+                  - 'ec2:DescribeVpcClassicLinkDnsSupport'
+                  - 'ec2:DescribeVpcEndpointConnectionNotifications'
+                  - 'ec2:DescribeVpcEndpointConnections'
+                  - 'ec2:DescribeVpcEndpoints'
+                  - 'ec2:DescribeVpcEndpointServiceConfigurations'
+                  - 'ec2:DescribeVpcEndpointServicePermissions'
+                  - 'ec2:DescribeVpcEndpointServices'
+                  - 'ec2:DescribeVpcPeeringConnections'
+                  - 'ec2:DescribeVpcs'
+                  - 'ec2:DescribeVpnConnections'
+                  - 'ec2:DescribeVpnGateways'
+                  - 'ec2:DetachClassicLinkVpc'
+                  - 'ec2:DetachInternetGateway'
+                  - 'ec2:DetachNetworkInterface'
+                  - 'ec2:DetachVpnGateway'
+                  - 'ec2:DisableVgwRoutePropagation'
+                  - 'ec2:DisableVpcClassicLink'
+                  - 'ec2:DisableVpcClassicLinkDnsSupport'
+                  - 'ec2:DisassociateAddress'
+                  - 'ec2:DisassociateRouteTable'
+                  - 'ec2:DisassociateSubnetCidrBlock'
+                  - 'ec2:DisassociateVpcCidrBlock'
+                  - 'ec2:EnableVgwRoutePropagation'
+                  - 'ec2:EnableVpcClassicLink'
+                  - 'ec2:EnableVpcClassicLinkDnsSupport'
+                  - 'ec2:ModifyNetworkInterfaceAttribute'
+                  - 'ec2:ModifySubnetAttribute'
+                  - 'ec2:ModifyVpcAttribute'
+                  - 'ec2:ModifyVpcEndpoint'
+                  - 'ec2:ModifyVpcEndpointConnectionNotification'
+                  - 'ec2:ModifyVpcEndpointServiceConfiguration'
+                  - 'ec2:ModifyVpcEndpointServicePermissions'
+                  - 'ec2:ModifyVpcPeeringConnectionOptions'
+                  - 'ec2:ModifyVpcTenancy'
+                  - 'ec2:MoveAddressToVpc'
+                  - 'ec2:RejectVpcEndpointConnections'
+                  - 'ec2:RejectVpcPeeringConnection'
+                  - 'ec2:ReleaseAddress'
+                  - 'ec2:ReplaceNetworkAclAssociation'
+                  - 'ec2:ReplaceNetworkAclEntry'
+                  - 'ec2:ReplaceRoute'
+                  - 'ec2:ReplaceRouteTableAssociation'
+                  - 'ec2:ResetNetworkInterfaceAttribute'
+                  - 'ec2:RestoreAddressToClassic'
+                  - 'ec2:RevokeSecurityGroupEgress'
+                  - 'ec2:RevokeSecurityGroupIngress'
+                  - 'ec2:UnassignIpv6Addresses'
+                  - 'ec2:UnassignPrivateIpAddresses'
+                  - 'ec2:UpdateSecurityGroupRuleDescriptionsEgress'
+                  - 'ec2:UpdateSecurityGroupRuleDescriptionsIngress'
+                Resource: '*'
+
+
+
+  DeployPipeline:
+    Type: "AWS::CodePipeline::Pipeline"
+    Properties:
+      Name: !Sub CFN-${AWS::StackName}
+      RoleArn: !GetAtt [ CodePipelineRole, Arn ]
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: CFNTemplateSource
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: CFNSourceOutput
+              Configuration:
+                BranchName: master
+                RepositoryName: !Ref CFNTemplateRepoName
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: CodeBuild
+              InputArtifacts:
+                - Name: CFNSourceOutput
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: CFNCodeBuildOutput
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              RunOrder: 1
+        - Name: Stage
+          Actions:              
+            - Name: CreateStageCFNStack
+              InputArtifacts:
+                - Name: CFNCodeBuildOutput
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              OutputArtifacts:
+                - Name: CreatedStageCFNStack
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                RoleArn: !GetAtt [ CloudFormationRole, Arn ]
+                Capabilities: CAPABILITY_NAMED_IAM
+                StackName: !Sub Stage-${AWS::StackName}
+                TemplateConfiguration: CFNCodeBuildOutput::vpc-config.json                
+                TemplatePath: CFNCodeBuildOutput::vpc.yml
+              RunOrder: 1
+
+      ArtifactStore:
+        Type: S3
+        Location:
+          Ref: ArtifactStoreS3Location              
+

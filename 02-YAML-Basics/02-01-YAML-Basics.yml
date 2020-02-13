@@ -1,0 +1,93 @@
+
+#Key Value Pairs
+Name: Dave
+Age: 29
+Gpa: 8.5
+Occupation: Engineer
+State: 'New Jersey'
+AboutMe: "I am a software engineer"
+Male: true
+DateOfBith: 1990-09-15T15:53:00
+PoliceCases: null
+
+#YAML Lists
+Persons:
+  - Dave
+  - John
+  - Mike  
+Persons: [Dave, John, Mike]
+
+#YAML Dictionary
+Dave:
+  Age: 25
+  Occupation: Engineer
+  State: New Jersey
+  gpa: 4.5
+  male: true
+
+#YAML Lists containing dictionaries
+Persons:
+  - Dave:
+      Age: 25
+      Occupation: Engineer
+      State: California
+  - John:
+      Age: 25
+      Occupation: Plumber
+      State: Florida
+  - Mike:
+      Age: 30
+      Occupation: Carpenter
+      State: Texas
+
+#YAML lists containing dictionaries containing lists
+Persons:
+  - Dave:
+      Age: 25
+      Occupation: Engineer
+      State: California
+      Degrees:
+        - Bachelors
+        - Masters
+        - Phd
+  - John:
+      Age: 25
+      Occupation: Plumber
+      State: Florida
+      Degrees: [Bachelors, Masters]
+  - Mike:
+      Age: 30
+      Occupation: Carpenter
+      State: Texas
+      Degrees:
+       - Masters  
+
+#YAML Pipe
+Dave:
+  Age: 25
+  Occupation: Engineer
+  State: New Jersey
+  gpa: 4.5
+  male: true
+  Address: |
+    201 ABC Street
+    Newark
+    New Jersey 07102
+    999-999-9999
+
+
+#YAML Greater than Sign
+Dave:
+  Age: 25
+  Occupation: Engineer
+  State: New Jersey
+  gpa: 4.5
+  male: true
+  AboutMe: >
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+    Curabitur tellus mi, consectetur id lorem nec, molestie 
+    malesuada tellus. 
+    Etiam lacinia nisi non consequat sodales. 
+    Integer nec mauris in quam fringilla pharetra et ac tortor. 
+    Duis odio odio, sodales vel consequat ut, sollicitudin.
+

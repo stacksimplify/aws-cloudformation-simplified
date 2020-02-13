@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  EnvironmentName:
+    Description: Select the environment 
+    Type: String
+    Default: dev
+    AllowedValues: 
+      - dev
+      - prod
+    ConstraintDescription: must be development or production      
+  InstanceType: 
+    Description: Select the ec2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues: 
+      - t2.micro
+      - t2.small
+      - t2.medium
+  KeyName:
+    Description: Key name to SSH to VM's. 
+    Type: AWS::EC2::KeyPair::KeyName
+  AvailabilityZone:
+    Description: select the availability zone
+    Type: String
+    Default: us-east-2a
+    AllowedValues:
+      - us-east-2a
+      - us-east-2b
+      - us-east-2c
+
+
+Conditions:
+  CreateEIPForProd: !Equals [!Ref EnvironmentName, prod]
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "EC2 Instance Configuration"    
+        Parameters:
+          - InstanceType
+          - KeyName
+          - AvailabilityZone  
+      - Label:
+          default: "Environment Configuration"          
+        Parameters:
+          - EnvironmentName  
+    ParameterLabels:
+      EnvironmentName:
+        default: "Which environment we are planning to create this instance?"
+      KeyName:
+        default: "Be aware that once keyname is selected we cannot change it unless instance replaced"
+
+Resources:
+  MyVMInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0cd3dfa4e37921605
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      AvailabilityZone: !Ref AvailabilityZone
+    
+  MyProdEIP:
+    Type: AWS::EC2::EIP
+    Condition: CreateEIPForProd
+    Properties: 
+      InstanceId: !Ref MyVMInstance
+          
+

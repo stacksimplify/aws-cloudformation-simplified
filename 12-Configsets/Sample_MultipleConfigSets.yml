@@ -1,0 +1,11 @@
+    Metadata:
+      Comment: Deploy a simple tomcat Application
+      AWS::CloudFormation::Init:
+        configSets:
+          SingleAppCS:
+            - App1
+          DualAppCS:
+            - ConfigSet: "SingleAppCS"
+            - App2
+          default: 
+            - ConfigSet: "DualAppCS"            

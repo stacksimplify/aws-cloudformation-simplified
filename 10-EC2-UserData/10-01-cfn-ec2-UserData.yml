@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  EnvironmentName:
+    Description: Select the environment 
+    Type: String
+    Default: dev
+    AllowedValues: 
+      - dev
+      - prod
+    ConstraintDescription: must be development or production      
+  InstanceType: 
+    Description: Select the ec2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues: 
+      - t2.micro
+      - t2.small
+      - t2.medium
+  KeyName:
+    Description: Key name to SSH to VM's. 
+    Type: AWS::EC2::KeyPair::KeyName
+  AvailabilityZone:
+    Description: select the availability zone
+    Type: String
+    Default: us-east-2a
+    AllowedValues:
+      - us-east-2a
+      - us-east-2b
+      - us-east-2c
+
+
+Conditions:
+  CreateEIPForProd: !Equals [!Ref EnvironmentName, prod]
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "EC2 Instance Configuration"    
+        Parameters:
+          - InstanceType
+          - KeyName
+          - AvailabilityZone  
+      - Label:
+          default: "Environment Configuration"          
+        Parameters:
+          - EnvironmentName  
+    ParameterLabels:
+      EnvironmentName:
+        default: "Which environment we are planning to create this instance?"
+      KeyName:
+        default: "Be aware that once keyname is selected we cannot change it unless instance replaced"
+
+Resources:
+  MySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: My SG with port 22, 8080 and 80 inbound
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '8080'          
+          ToPort: '8080'
+          CidrIp: 0.0.0.0/0
+ 
+  MyVMInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0cd3dfa4e37921605
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      AvailabilityZone: !Ref AvailabilityZone
+      SecurityGroups:
+        - !Ref MySecurityGroup
+      UserData: 
+        Fn::Base64: |  
+          #!/bin/bash
+          sudo yum update
+          sudo yum -y erase java-1.7.0-openjdk.x86_64
+          sudo yum -y install java-1.8.0-openjdk.x86_64
+          sudo yum -y install java-1.8.0-openjdk-devel
+          sudo yum -y install tomcat8
+          service tomcat8 start
+          mkdir /usr/share/tomcat8/webapps/ROOT
+          touch /usr/share/tomcat8/webapps/ROOT/index.html
+          echo "Cloud Formation Tomcat8" > /usr/share/tomcat8/webapps/ROOT/index.html
+      
+    
+  MyProdEIP:
+    Type: AWS::EC2::EIP
+    Condition: CreateEIPForProd
+    Properties: 
+      InstanceId: !Ref MyVMInstance
+
+      
+Outputs:
+  AppURL:
+    Description: Tomcat App Access URL
+    Value: !Sub 'http://${MyVMInstance.PublicDnsName}:8080/index.html'          

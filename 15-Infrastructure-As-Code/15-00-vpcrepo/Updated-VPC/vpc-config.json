@@ -1,0 +1,7 @@
+{
+  "Parameters" : {
+    "VpcBlock" : "10.0.0.0/16",
+    "Subnet01Block" : "10.0.1.0/24",    
+    "Subnet02Block" : "10.0.2.0/24"
+  }
+}
