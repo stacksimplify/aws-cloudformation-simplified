@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This template will help you in creating EC2 Instance in existing VPC
+
+# This template is going to work in us-east-2 (Ohio)
+# This template has hardcoded AMI Instance Id from us-east-2
+
+Parameters:
+  MyKeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC which contains our subnet where we plan to launch EC2 Instance. VPC Id required to reference in security group.  
+      
+  PublicSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet in to which you want to launch EC2 Instance. Select the subnet from VPC you have selected in previous parameter
+
+# Important Note-1: If we want to launch to existing Subnet & VPC, for EC2 instance we need to use the property NetworkInterfaces
+# Important Note-2: When you use network interface you can reference subnetid in it where you want to launch EC2 Instance.
+# Important Note-3: The way we reference security group in EC2 Instance also changes when you use NetworkInterfaces property in EC2 Instance.  
+# You need to use "GroupSet" property to reference security group. 
+
+
+Resources:
+  MyVMInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-04768381bf606e2b3
+      InstanceType: t2.micro
+      KeyName: !Ref MyKeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: !Ref PublicSubnetId
+          GroupSet: 
+            - !Ref DevSecurityGroup     
+      UserData: 
+        Fn::Base64: |
+          #!/bin/bash
+          sudo yum update
+          sudo yum -y erase java-1.7.0-openjdk.x86_64
+          sudo yum -y install java-1.8.0-openjdk.x86_64
+          sudo yum -y install java-1.8.0-openjdk-devel
+          sudo yum -y install tomcat8
+          service tomcat8 start
+          mkdir /usr/share/tomcat8/webapps/ROOT
+          touch /usr/share/tomcat8/webapps/ROOT/index.html
+          echo "Cloud Formation Tomcat8" > /usr/share/tomcat8/webapps/ROOT/index.html
+
+  DevSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Dev Apps Security Group
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '8080'
+          ToPort: '8080'
+          CidrIp: 0.0.0.0/0
+      VpcId: !Ref VpcId
+
+Outputs:
+  AppURL:
+    Description: Application URL to access the tomcat page
+    Value: !Sub 'http://${MyVMInstance.PublicDnsName}:8080/index.html'            
