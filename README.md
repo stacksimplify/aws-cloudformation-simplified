@@ -4,6 +4,10 @@ Welcome to this Amazing course on AWS CloudFormation Simplified. We will learn b
 
 AWS CloudFormation is a core Service in AWS which allows us to automate the Infrastructure and Application Deployments. We can achieve Continuous Integration, Continuous Delivery and Infrastructure as Code when using AWS CloudFormation in combination with AWS Developer Tools like AWS CodeCommit, AWS CodeBuild, AWS CodeDeploy and AWS CodePipeline. 
 
+## AWS CloudFormation Udemy Course
+[![Image](https://stacksimplify.com/course-images/AWS-CloudFormation-Simplified.png "AWS CloudFormation - Simplified")](https://www.udemy.com/aws-cloudformation-simplified-hands-on-learning/?couponCode=STACKSIMPLIFY-2019)
+
+
 There are two parts to this course. 
 
 In the first part of the course you will learn all the AWS CloudFormation concepts by practically implementing them. Below are the sections for part one. 
